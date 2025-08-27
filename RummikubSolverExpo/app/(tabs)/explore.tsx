@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { StyleSheet, ScrollView, View, TouchableOpacity, Switch } from 'react-native';
-import Slider from '@react-native-community/slider';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { solveRummikubGame, Tile as SolverTile } from '../../utils/rummikubSolver';
 
 interface Tile {
   id: string;
@@ -14,13 +14,14 @@ interface Tile {
 
 export default function TileSelectionScreen() {
   const [selectedColor, setSelectedColor] = useState(0);
-  const [selectedNumber, setSelectedNumber] = useState(1);
+  const [selectedNumber, setSelectedNumber] = useState(0);
   const [isTableList, setIsTableList] = useState(false);
   const [tableTiles, setTableTiles] = useState<Tile[]>([]);
   const [handTiles, setHandTiles] = useState<Tile[]>([]);
+  const [solverResult, setSolverResult] = useState<string | null>(null);
 
   const colors = ['Red', 'Yellow', 'Blue', 'Black'];
-  const numbers = Array.from({ length: 14 }, (_, i) => i + 1);
+  const numbers = Array.from({ length: 14 }, (_, i) => i);
 
   const getColorValue = (colorIndex: number) => {
     const colorMap = ['#FF0000', '#FFD700', '#0000FF', '#000000'];
@@ -58,6 +59,12 @@ export default function TileSelectionScreen() {
     }
   };
 
+  const runSolver = () => {
+    // Use the imported solver function
+    const result = solveRummikubGame(handTiles, tableTiles);
+    setSolverResult(result.isSolvable ? 'Solvable' : 'Unsolvable');
+  };
+
 
 
   return (
@@ -92,35 +99,30 @@ export default function TileSelectionScreen() {
         <ThemedText type="subtitle" style={styles.sectionTitle}>
           Color Selection
         </ThemedText>
-        <View style={styles.sliderContainer}>
-          <Slider
-            style={styles.slider}
-            minimumValue={0}
-            maximumValue={3}
-            step={1}
-            value={selectedColor}
-            onValueChange={setSelectedColor}
-            minimumTrackTintColor="#A1CEDC"
-            maximumTrackTintColor="#D0D0D0"
-          />
-          <View style={styles.sliderLabels}>
-            {colors.map((color, index) => (
-              <ThemedText key={color} style={styles.sliderLabel}>
+        <View style={styles.colorButtonsContainer}>
+          {colors.map((color, index) => (
+            <TouchableOpacity
+              key={color}
+              style={[
+                styles.colorButton,
+                selectedColor === index && styles.colorButtonSelected
+              ]}
+              onPress={() => setSelectedColor(index)}
+            >
+              <View 
+                style={[
+                  styles.colorButtonCircle, 
+                  { backgroundColor: getColorValue(index) }
+                ]} 
+              />
+              <ThemedText style={[
+                styles.colorButtonText,
+                selectedColor === index && styles.colorButtonTextSelected
+              ]}>
                 {color}
               </ThemedText>
-            ))}
-          </View>
-        </View>
-        <View style={styles.colorPreview}>
-          <View 
-            style={[
-              styles.colorCircle, 
-              { backgroundColor: getColorValue(selectedColor) }
-            ]} 
-          />
-          <ThemedText style={styles.selectedValue}>
-            Selected: {colors[selectedColor]}
-          </ThemedText>
+            </TouchableOpacity>
+          ))}
         </View>
       </ThemedView>
 
@@ -128,32 +130,47 @@ export default function TileSelectionScreen() {
         <ThemedText type="subtitle" style={styles.sectionTitle}>
           Number Selection
         </ThemedText>
-        <View style={styles.sliderContainer}>
-          <Slider
-            style={styles.slider}
-            minimumValue={1}
-            maximumValue={14}
-            step={1}
-            value={selectedNumber}
-            onValueChange={setSelectedNumber}
-            minimumTrackTintColor="#A1CEDC"
-            maximumTrackTintColor="#D0D0D0"
-          />
-          <View style={styles.sliderLabels}>
-            <ThemedText style={styles.sliderLabel}>1</ThemedText>
-            <ThemedText style={styles.sliderLabel}>7</ThemedText>
-            <ThemedText style={styles.sliderLabel}>14</ThemedText>
-          </View>
-        </View>
-        <View style={styles.numberPreview}>
-          <View style={styles.numberCircle}>
-            <ThemedText style={styles.numberText}>
-              {selectedNumber}
+        <View style={styles.numberButtonsContainer}>
+          {/* Joker button */}
+          <TouchableOpacity
+            style={[
+              styles.numberButton,
+              selectedNumber === 0 && styles.numberButtonSelected
+            ]}
+            onPress={() => setSelectedNumber(0)}
+          >
+            <ThemedText style={[
+              styles.numberButtonText,
+              selectedNumber === 0 && styles.numberButtonTextSelected
+            ]}>
+              🃏
             </ThemedText>
-          </View>
-          <ThemedText style={styles.selectedValue}>
-            Selected: {selectedNumber}
-          </ThemedText>
+            <ThemedText style={[
+              styles.numberButtonLabel,
+              selectedNumber === 0 && styles.numberButtonLabelSelected
+            ]}>
+              Joker
+            </ThemedText>
+          </TouchableOpacity>
+          
+          {/* Number buttons 1-13 */}
+          {Array.from({ length: 13 }, (_, i) => i + 1).map((number) => (
+            <TouchableOpacity
+              key={number}
+              style={[
+                styles.numberButton,
+                selectedNumber === number && styles.numberButtonSelected
+              ]}
+              onPress={() => setSelectedNumber(number)}
+            >
+              <ThemedText style={[
+                styles.numberButtonText,
+                selectedNumber === number && styles.numberButtonTextSelected
+              ]}>
+                {number}
+              </ThemedText>
+            </TouchableOpacity>
+          ))}
         </View>
       </ThemedView>
 
@@ -300,6 +317,35 @@ export default function TileSelectionScreen() {
           </View>
         </View>
       </ThemedView>
+
+      <ThemedView style={[styles.section, styles.lastSection]}>
+        <ThemedText type="subtitle" style={styles.sectionTitle}>
+          Game Solver
+        </ThemedText>
+        <ThemedText style={styles.solverDescription}>
+          Analyze your current game state to see if it's possible to win
+        </ThemedText>
+        
+        <TouchableOpacity style={styles.solverButton} onPress={runSolver}>
+          <ThemedText style={styles.solverButtonText}>
+            Run Solver
+          </ThemedText>
+        </TouchableOpacity>
+
+        {solverResult && (
+          <View style={styles.resultContainer}>
+            <ThemedText style={styles.resultLabel}>Result:</ThemedText>
+            <View style={[
+              styles.resultBadge, 
+              { backgroundColor: solverResult === 'Solvable' ? '#4CAF50' : '#F44336' }
+            ]}>
+              <ThemedText style={styles.resultText}>
+                {solverResult}
+              </ThemedText>
+            </View>
+          </View>
+        )}
+      </ThemedView>
     </ScrollView>
   );
 }
@@ -308,6 +354,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+    paddingTop: 20,
+    paddingBottom: 100, // Increased bottom padding to account for tab bar and safe areas
   },
   header: {
     alignItems: 'center',
@@ -359,59 +407,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
     color: '#353636',
-  },
-  sliderContainer: {
-    marginBottom: 16,
-  },
-  slider: {
-    width: '100%',
-    height: 40,
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  sliderLabel: {
-    fontSize: 12,
-    color: '#666',
-  },
-  colorPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  colorCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: '#ddd',
-  },
-  numberPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  numberCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#A1CEDC',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#ddd',
-  },
-  numberText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#353636',
-  },
-  selectedValue: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
   },
   tilePreview: {
     alignItems: 'center',
@@ -546,5 +541,192 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#353636',
     fontWeight: 'bold',
+  },
+  solverDescription: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  solverButton: {
+    backgroundColor: '#A1CEDC',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  solverButtonText: {
+    color: '#353636',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  resultContainer: {
+    alignItems: 'center',
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  resultLabel: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  resultBadge: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  resultText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  lastSection: {
+    marginBottom: 40, // Extra bottom margin for the last section
+  },
+  colorButtonsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    gap: 16,
+    paddingHorizontal: 8,
+  },
+  colorButton: {
+    width: '45%',
+    aspectRatio: 1.2,
+    borderRadius: 16,
+    borderWidth: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    padding: 12,
+  },
+  colorButtonSelected: {
+    borderWidth: 3,
+    borderColor: '#4A90E2',
+    shadowColor: '#4A90E2',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 12,
+    transform: [{ scale: 1.05 }],
+  },
+  colorButtonCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.8)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  colorButtonText: {
+    fontSize: 16,
+    color: '#555',
+    marginTop: 12,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  colorButtonTextSelected: {
+    color: '#4A90E2',
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(74,144,226,0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  numberButtonsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    gap: 12,
+    paddingHorizontal: 8,
+  },
+  numberButton: {
+    width: '18%',
+    aspectRatio: 1.1,
+    borderRadius: 14,
+    borderWidth: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 6,
+    padding: 8,
+    marginBottom: 8,
+  },
+  numberButtonSelected: {
+    borderWidth: 2,
+    borderColor: '#4A90E2',
+    backgroundColor: '#F0F8FF',
+    shadowColor: '#4A90E2',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+    transform: [{ scale: 1.08 }],
+  },
+  numberButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    textShadowColor: 'rgba(0,0,0,0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  numberButtonTextSelected: {
+    color: '#4A90E2',
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(74,144,226,0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  numberButtonLabel: {
+    fontSize: 11,
+    color: '#7F8C8D',
+    marginTop: 4,
+    fontWeight: '500',
+    textShadowColor: 'rgba(0,0,0,0.05)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+  numberButtonLabelSelected: {
+    color: '#4A90E2',
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(74,144,226,0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
 });
