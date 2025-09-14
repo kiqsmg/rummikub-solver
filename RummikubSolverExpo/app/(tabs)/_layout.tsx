@@ -40,6 +40,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="gamecontroller.fill" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="solver"
+        options={{
+          title: 'AI Solver',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="brain.head.profile" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

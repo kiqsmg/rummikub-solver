@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { StyleSheet, ScrollView, View, TouchableOpacity, Switch } from 'react-native';
+import { StyleSheet, ScrollView, View, TouchableOpacity, Switch, Alert } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { solveRummikubGame, Tile as SolverTile } from '../../utils/rummikubSolver';
+import { solveRummikubGame, Tile as SolverTile, SolverResult } from '../../utils/rummikubSolver';
 
 interface Tile {
   id: string;
@@ -18,7 +18,8 @@ export default function TileSelectionScreen() {
   const [isTableList, setIsTableList] = useState(false);
   const [tableTiles, setTableTiles] = useState<Tile[]>([]);
   const [handTiles, setHandTiles] = useState<Tile[]>([]);
-  const [solverResult, setSolverResult] = useState<string | null>(null);
+  const [solverResult, setSolverResult] = useState<SolverResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const colors = ['Red', 'Yellow', 'Blue', 'Black'];
   const numbers = Array.from({ length: 14 }, (_, i) => i);
@@ -59,22 +60,47 @@ export default function TileSelectionScreen() {
     }
   };
 
-  const runSolver = () => {
-    // Use the imported solver function
-    const result = solveRummikubGame(handTiles, tableTiles);
-    setSolverResult(result.isSolvable ? 'Solvable' : 'Unsolvable');
+  const runSolver = async () => {
+    if (handTiles.length === 0 && tableTiles.length === 0) {
+      Alert.alert('No Tiles', 'Please add some tiles before running the solver.');
+      return;
+    }
+
+    setIsLoading(true);
+    setSolverResult(null);
+
+    try {
+      // Simulate some processing time for better UX
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const result = solveRummikubGame(handTiles, tableTiles);
+      setSolverResult(result);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to run the solver. Please try again.');
+      console.error('Solver error:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  const getScoreColor = (score: number, maxPossible: number) => {
+    const percentage = (score / maxPossible) * 100;
+    if (percentage >= 80) return '#4CAF50'; // Green
+    if (percentage >= 60) return '#FF9800'; // Orange
+    return '#F44336'; // Red
+  };
 
+  const totalTileValue = handTiles.reduce((sum, tile) => sum + tile.number, 0) + 
+                        tableTiles.reduce((sum, tile) => sum + tile.number, 0);
 
   return (
     <ScrollView style={styles.container}>
       <ThemedView style={styles.header}>
         <ThemedText type="title" style={styles.title}>
-          Tile Selection
+          Rummikub Solver
         </ThemedText>
         <ThemedText style={styles.subtitle}>
-          Select your Rummikub tile
+          Advanced AI-powered tile analysis
         </ThemedText>
       </ThemedView>
 
@@ -300,7 +326,7 @@ export default function TileSelectionScreen() {
 
       <ThemedView style={styles.section}>
         <ThemedText type="subtitle" style={styles.sectionTitle}>
-          Summary
+          Game Summary
         </ThemedText>
         <View style={styles.summaryContainer}>
           <View style={styles.summaryItem}>
@@ -315,34 +341,69 @@ export default function TileSelectionScreen() {
             <ThemedText style={styles.summaryLabel}>Total Tiles:</ThemedText>
             <ThemedText style={styles.summaryValue}>{handTiles.length + tableTiles.length}</ThemedText>
           </View>
+          <View style={styles.summaryItem}>
+            <ThemedText style={styles.summaryLabel}>Total Value:</ThemedText>
+            <ThemedText style={styles.summaryValue}>{totalTileValue}</ThemedText>
+          </View>
         </View>
       </ThemedView>
 
       <ThemedView style={[styles.section, styles.lastSection]}>
         <ThemedText type="subtitle" style={styles.sectionTitle}>
-          Game Solver
+          AI Solver Analysis
         </ThemedText>
         <ThemedText style={styles.solverDescription}>
-          Analyze your current game state to see if it's possible to win
+          Advanced dynamic programming algorithm analyzes your game state
         </ThemedText>
         
-        <TouchableOpacity style={styles.solverButton} onPress={runSolver}>
+        <TouchableOpacity 
+          style={[styles.solverButton, isLoading && styles.solverButtonDisabled]} 
+          onPress={runSolver}
+          disabled={isLoading}
+        >
           <ThemedText style={styles.solverButtonText}>
-            Run Solver
+            {isLoading ? 'Analyzing...' : 'Run AI Solver'}
           </ThemedText>
         </TouchableOpacity>
 
         {solverResult && (
           <View style={styles.resultContainer}>
-            <ThemedText style={styles.resultLabel}>Result:</ThemedText>
-            <View style={[
-              styles.resultBadge, 
-              { backgroundColor: solverResult === 'Solvable' ? '#4CAF50' : '#F44336' }
-            ]}>
-              <ThemedText style={styles.resultText}>
-                {solverResult}
+            <View style={styles.resultHeader}>
+              <ThemedText style={styles.resultLabel}>Analysis Result:</ThemedText>
+              <View style={[
+                styles.resultBadge, 
+                { backgroundColor: solverResult.isSolvable ? '#4CAF50' : '#F44336' }
+              ]}>
+                <ThemedText style={styles.resultText}>
+                  {solverResult.isSolvable ? 'SOLVABLE' : 'NOT SOLVABLE'}
+                </ThemedText>
+              </View>
+            </View>
+            
+            <View style={styles.scoreContainer}>
+              <ThemedText style={styles.scoreLabel}>Max Score:</ThemedText>
+              <ThemedText style={[
+                styles.scoreValue,
+                { color: getScoreColor(solverResult.maxScore || 0, totalTileValue) }
+              ]}>
+                {solverResult.maxScore || 0} / {totalTileValue}
               </ThemedText>
             </View>
+            
+            <ThemedText style={styles.reasonText}>
+              {solverResult.reason}
+            </ThemedText>
+
+            {solverResult.suggestedMoves && solverResult.suggestedMoves.length > 0 && (
+              <View style={styles.movesContainer}>
+                <ThemedText style={styles.movesTitle}>Suggested Moves:</ThemedText>
+                {solverResult.suggestedMoves.map((move, index) => (
+                  <View key={index} style={styles.moveItem}>
+                    <ThemedText style={styles.moveText}>{move}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
       </ThemedView>
@@ -355,17 +416,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
     paddingTop: 20,
-    paddingBottom: 100, // Increased bottom padding to account for tab bar and safe areas
+    paddingBottom: 100,
   },
   header: {
     alignItems: 'center',
     paddingVertical: 20,
-    backgroundColor: '#D0D0D0',
+    backgroundColor: '#A1CEDC',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#353636',
+    color: '#1D3D47',
     marginBottom: 8,
   },
   subtitle: {
@@ -400,43 +461,117 @@ const styles = StyleSheet.create({
   switchDescription: {
     fontSize: 14,
     color: '#666',
-    textAlign: 'center',
+    marginTop: 4,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#353636',
+    marginBottom: 12,
+    color: '#1D3D47',
+  },
+  colorButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+  },
+  colorButton: {
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
+    minWidth: 70,
+  },
+  colorButtonSelected: {
+    backgroundColor: '#E3F2FD',
+    borderWidth: 2,
+    borderColor: '#2196F3',
+  },
+  colorButtonCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginBottom: 4,
+  },
+  colorButtonText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  colorButtonTextSelected: {
+    color: '#2196F3',
+    fontWeight: 'bold',
+  },
+  numberButtonsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  numberButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 45,
+    height: 45,
+    margin: 2,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  numberButtonSelected: {
+    backgroundColor: '#A1CEDC',
+    borderColor: '#1D3D47',
+  },
+  numberButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  numberButtonTextSelected: {
+    color: '#1D3D47',
+  },
+  numberButtonLabel: {
+    fontSize: 8,
+    color: '#666',
+    marginTop: 2,
+  },
+  numberButtonLabelSelected: {
+    color: '#1D3D47',
   },
   tilePreview: {
     alignItems: 'center',
-    gap: 16,
     marginBottom: 16,
   },
   tile: {
-    width: 80,
-    height: 100,
+    width: 60,
+    height: 80,
     backgroundColor: 'white',
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#ddd',
-    overflow: 'hidden',
+    borderColor: '#E0E0E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   tileColor: {
+    width: 20,
     height: 20,
-    width: '100%',
+    borderRadius: 10,
+    marginBottom: 4,
   },
   tileNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#353636',
-    textAlign: 'center',
-    marginTop: 30,
-  },
-  tileDescription: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#353636',
+    color: '#333',
+  },
+  tileDescription: {
+    fontSize: 14,
+    color: '#666',
   },
   addButton: {
     backgroundColor: '#A1CEDC',
@@ -444,10 +579,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
   },
   addButtonText: {
-    color: '#353636',
+    color: '#1D3D47',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -455,278 +589,181 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   clearButton: {
-    backgroundColor: '#FF6B6B',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    backgroundColor: '#F44336',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 6,
   },
   clearButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
   },
   emptyText: {
-    textAlign: 'center',
+    fontSize: 14,
     color: '#666',
+    textAlign: 'center',
     fontStyle: 'italic',
     paddingVertical: 20,
   },
   tilesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'flex-start',
   },
   tileItem: {
-    position: 'relative',
+    margin: 4,
+    alignItems: 'center',
   },
   tileItemTile: {
-    width: 60,
-    height: 75,
+    width: 40,
+    height: 50,
     backgroundColor: 'white',
     borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#ddd',
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
   tileItemColor: {
-    height: 15,
-    width: '100%',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginBottom: 2,
   },
   tileItemNumber: {
-    fontSize: 18,
+    fontSize: 12,
     fontWeight: 'bold',
-    color: '#353636',
-    textAlign: 'center',
-    marginTop: 20,
+    color: '#333',
   },
   removeButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#FF6B6B',
+    backgroundColor: '#F44336',
     width: 20,
     height: 20,
     borderRadius: 10,
-    justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
+    justifyContent: 'center',
   },
   removeButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
-    lineHeight: 16,
   },
   summaryContainer: {
-    gap: 12,
+    backgroundColor: '#F8F9FA',
+    padding: 12,
+    borderRadius: 8,
   },
   summaryItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    marginBottom: 4,
   },
   summaryLabel: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
+    fontSize: 14,
+    color: '#666',
   },
   summaryValue: {
-    fontSize: 16,
-    color: '#353636',
+    fontSize: 14,
     fontWeight: 'bold',
+    color: '#333',
   },
   solverDescription: {
     fontSize: 14,
     color: '#666',
-    textAlign: 'center',
     marginBottom: 16,
+    textAlign: 'center',
   },
   solverButton: {
-    backgroundColor: '#A1CEDC',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 16,
   },
+  solverButtonDisabled: {
+    backgroundColor: '#CCCCCC',
+  },
   solverButtonText: {
-    color: '#353636',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  resultContainer: {
-    alignItems: 'center',
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  resultLabel: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  resultBadge: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  resultText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  lastSection: {
-    marginBottom: 40, // Extra bottom margin for the last section
+  resultContainer: {
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
-  colorButtonsContainer: {
+  resultHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    gap: 16,
-    paddingHorizontal: 8,
-  },
-  colorButton: {
-    width: '45%',
-    aspectRatio: 1.2,
-    borderRadius: 16,
-    borderWidth: 0,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
-    padding: 12,
+    marginBottom: 12,
   },
-  colorButtonSelected: {
-    borderWidth: 3,
-    borderColor: '#4A90E2',
-    shadowColor: '#4A90E2',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 12,
-    transform: [{ scale: 1.05 }],
-  },
-  colorButtonCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.8)',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  colorButtonText: {
+  resultLabel: {
     fontSize: 16,
-    color: '#555',
-    marginTop: 12,
-    fontWeight: '600',
-    textShadowColor: 'rgba(0,0,0,0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  colorButtonTextSelected: {
-    color: '#4A90E2',
     fontWeight: 'bold',
-    textShadowColor: 'rgba(74,144,226,0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    color: '#333',
   },
-  numberButtonsContainer: {
+  resultBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  resultText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  scoreContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    gap: 12,
-    paddingHorizontal: 8,
-  },
-  numberButton: {
-    width: '18%',
-    aspectRatio: 1.1,
-    borderRadius: 14,
-    borderWidth: 0,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 6,
-    padding: 8,
     marginBottom: 8,
   },
-  numberButtonSelected: {
-    borderWidth: 2,
-    borderColor: '#4A90E2',
-    backgroundColor: '#F0F8FF',
-    shadowColor: '#4A90E2',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-    transform: [{ scale: 1.08 }],
+  scoreLabel: {
+    fontSize: 14,
+    color: '#666',
   },
-  numberButtonText: {
-    fontSize: 18,
+  scoreValue: {
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#2C3E50',
-    textShadowColor: 'rgba(0,0,0,0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
-  numberButtonTextSelected: {
-    color: '#4A90E2',
+  reasonText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  movesContainer: {
+    marginTop: 8,
+  },
+  movesTitle: {
+    fontSize: 14,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(74,144,226,0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    color: '#333',
+    marginBottom: 8,
   },
-  numberButtonLabel: {
-    fontSize: 11,
-    color: '#7F8C8D',
-    marginTop: 4,
-    fontWeight: '500',
-    textShadowColor: 'rgba(0,0,0,0.05)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
+  moveItem: {
+    backgroundColor: 'white',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 4,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4CAF50',
   },
-  numberButtonLabelSelected: {
-    color: '#4A90E2',
-    fontWeight: 'bold',
-    textShadowColor: 'rgba(74,144,226,0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+  moveText: {
+    fontSize: 12,
+    color: '#333',
+  },
+  lastSection: {
+    marginBottom: 20,
   },
 });
